@@ -14,7 +14,7 @@ Servo wheelLeft;
 Servo wheelRight;
 Servo gripper;
 bool joystickMode = false;
-
+int gripperPosition = 0;
 void setup() {
   Serial.begin(9600);
   wheelLeft.attach(13);
@@ -59,69 +59,49 @@ void setup() {
 }
 
 void loop() {
-  /* You must Read Gamepad to get new values
-    Read GamePad and set vibration values
-    ps2x.read_gamepad(small motor on/off, larger motor strenght from 0-255)
-    if you don't enable the rumble, use ps2x.read_gamepad(); with no values
-
-    you should call this at least once a second
-  */
-
-
 
   if (error == 1) //skip loop if no controller found
     return;
 
   if (type == 2) { //Guitar Hero Controller
-
-    ps2x.read_gamepad();          //read controller
-
-    if (ps2x.ButtonPressed(GREEN_FRET))
-      Serial.println("Green Fret Pressed");
-    if (ps2x.ButtonPressed(RED_FRET))
-      Serial.println("Red Fret Pressed");
-    if (ps2x.ButtonPressed(YELLOW_FRET))
-      Serial.println("Yellow Fret Pressed");
-    if (ps2x.ButtonPressed(BLUE_FRET))
-      Serial.println("Blue Fret Pressed");
-    if (ps2x.ButtonPressed(ORANGE_FRET))
-      Serial.println("Orange Fret Pressed");
-
-
-    if (ps2x.ButtonPressed(STAR_POWER))
-      Serial.println("Star Power Command");
-
-    if (ps2x.Button(UP_STRUM))         //will be TRUE as long as button is pressed
-      Serial.println("Up Strum");
-    if (ps2x.Button(DOWN_STRUM))
-      Serial.println("DOWN Strum");
-
-
-    if (ps2x.Button(PSB_START))                  //will be TRUE as long as button is pressed
-      Serial.println("Start is being held");
-    if (ps2x.Button(PSB_SELECT))
-      Serial.println("Select is being held");
-
-
-    if (ps2x.Button(ORANGE_FRET)) // print stick value IF TRUE
-    {
-      Serial.print("Wammy Bar Position:");
-      Serial.println(ps2x.Analog(WHAMMY_BAR), DEC);
-    }
+    //Do nothing
   }
 
   else { //DualShock Controller
 
-    ps2x.read_gamepad(false, vibrate);          //read controller and set large motor to spin at 'vibrate' speed
+    ps2x.read_gamepad(false, vibrate);          //read controller and set small motor off and large motor to spin at 'vibrate' speed
 
-    if (ps2x.Button(PSB_START))                  //will be TRUE as long as button is pressed
-      Serial.println("Start is being held");
+    //Change between button mode and joystick mode
     if (ps2x.ButtonPressed(PSB_SELECT)) {
       joystickMode = !joystickMode;
     }
 
+    //Move robot based on selected control scheme
     if (joystickMode == true) {
-      int leftStickYAxis = ps2x.Analog(PSS_LY);
+      joystickControls();
+    } else {
+      buttonControls();
+    }
+
+    //gripper open/close
+    if (ps2x.ButtonPressed(PSB_GREEN)) {
+      if (gripperPosition == 0) {
+        gripperPosition = 120;
+      } else {
+        gripperPosition = 0;
+      }
+    }
+    gripper.write(gripperPosition);
+    
+  }
+
+
+  delay(50);
+
+}
+
+void joystickControls() {
+  int leftStickYAxis = ps2x.Analog(PSS_LY);
       int leftStickXAxis = ps2x.Analog(PSS_LX);
       int speedLeft = map(leftStickYAxis, 0, 255, 135, 45);
       Serial.print(speedLeft);
@@ -141,9 +121,10 @@ void loop() {
         wheelLeft.write(speedLeft);
         wheelRight.write(speedRight);
       }
-    }
-    if (joystickMode == false) {
-      if (ps2x.Button(PSB_PAD_UP)) {        //will be TRUE as long as button is pressed
+}
+
+void buttonControls() {
+  if (ps2x.Button(PSB_PAD_UP)) {        //will be TRUE as long as button is pressed
         Serial.print("Up held this hard: ");
         Serial.println(ps2x.Analog(PSAB_PAD_UP), DEC);
         wheelLeft.write(135);
@@ -173,64 +154,4 @@ void loop() {
         wheelLeft.writeMicroseconds(1500);
         wheelRight.writeMicroseconds(1500);
       }
-    }
-
-    
-    
-    if (ps2x.Button(PSB_GREEN)) {
-      gripper.write(120);
-    } else {
-      gripper.write(0);
-    }
-    
-    vibrate = ps2x.Analog(PSAB_BLUE);        //this will set the large motor vibrate speed based on
-    //how hard you press the blue (X) button
-
-    if (ps2x.NewButtonState())               //will be TRUE if any button changes state (on to off, or off to on)
-    {
-
-
-
-      if (ps2x.Button(PSB_L3))
-        Serial.println("L3 pressed");
-      if (ps2x.Button(PSB_R3))
-        Serial.println("R3 pressed");
-      if (ps2x.Button(PSB_L2))
-        Serial.println("L2 pressed");
-      if (ps2x.Button(PSB_R2))
-        Serial.println("R2 pressed");
-      if (ps2x.Button(PSB_GREEN))
-        Serial.println("Triangle pressed");
-
-    }
-
-
-    if (ps2x.ButtonPressed(PSB_RED))            //will be TRUE if button was JUST pressed
-      Serial.println("Circle just pressed");
-
-    if (ps2x.ButtonReleased(PSB_PINK))            //will be TRUE if button was JUST released
-      Serial.println("Square just released");
-
-    if (ps2x.NewButtonState(PSB_BLUE))           //will be TRUE if button was JUST pressed OR released
-      Serial.println("X just changed");
-
-
-    if (ps2x.Button(PSB_L1) || ps2x.Button(PSB_R1)) // print stick values if either is TRUE
-    {
-      Serial.print("Stick Values:");
-      Serial.print(ps2x.Analog(PSS_LY), DEC); //Left stick, Y axis. Other options: LX, RY, RX
-      Serial.print(",");
-      Serial.print(ps2x.Analog(PSS_LX), DEC);
-      Serial.print(",");
-      Serial.print(ps2x.Analog(PSS_RY), DEC);
-      Serial.print(",");
-      Serial.println(ps2x.Analog(PSS_RX), DEC);
-    }
-
-
-  }
-
-
-  delay(50);
-
 }
