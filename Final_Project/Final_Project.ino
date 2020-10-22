@@ -79,7 +79,7 @@ void loop() {
   if (ps2ControllerMode == true) { //control with ps2 controller
     controller();
   } else { //control with IR remote
-    
+
     if (myIR.decode(&results)) {
       Serial.println("ir");
       Serial.println(results.value, HEX);
@@ -89,6 +89,8 @@ void loop() {
 
   }
 
+  gripper.write(gripperPosition);
+  
   delay(50);
 
 }
@@ -126,14 +128,14 @@ void controller() {
         gripperPosition = 0;
       }
     }
-    gripper.write(gripperPosition);
+    
 
   }
 }
 
 void joystickControls() {
-  int leftStickYAxis = ps2x.Analog(PSS_LY);
-  int leftStickXAxis = ps2x.Analog(PSS_LX);
+  int leftStickYAxis = ps2x.Analog(PSS_RY);
+  int leftStickXAxis = ps2x.Analog(PSS_RX);
   int speedLeft = map(leftStickYAxis, 0, 255, 135, 45);
   Serial.print(speedLeft);
   Serial.print(" ");
@@ -213,6 +215,12 @@ void translateIR() {                        // takes action based on IR code rec
       break;
     case 0xFFA857:
       Serial.println("VOL-");
+      if (gripperPosition == 0) {
+        gripperPosition = 120;
+      } else {
+        gripperPosition = 0;
+      }
+      Serial.println(gripperPosition);
       break;
     case 0xFF906F:
       Serial.println("UP");
