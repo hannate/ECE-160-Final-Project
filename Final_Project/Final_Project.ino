@@ -1,38 +1,40 @@
+#include <EIRremote.h>
+#include <EIRremoteInt.h>
+
 #include <PS2X_lib.h>  //for v1.6
 #include <Servo.h>
 #include <SPI.h>
 #include <NRFLite.h>
 
-PS2X ps2x; // create PS2 Controller Class
 
+bool ps2ControllerMode = false; //true to use ps2 controller, false to use ir remote
+int IRStep = 1000;
+
+int IRPin = 10;
 int error = 0;
 byte type = 0;
 byte vibrate = 0;
 Servo wheelLeft;
 Servo wheelRight;
 Servo gripper;
-const static uint8_t RADIO_ID = 0;
-const static uint8_t PIN_RADIO_CE = 9;
-const static uint8_t PIN_RADIO_CSN = 10;
+IRrecv myIR(IRPin);
+decode_results results;
+PS2X ps2x; // create PS2 Controller Class
+
 bool joystickMode = false;
 int gripperPosition = 0;
 
-struct RadioPacket { //max 32 bytes
-  uint8_t FromRadioId;
-  uint32_t OnTimeMillis;
-  uint32_t FailedTxCount;
-};
 
-NRFLite _radio;
-RadioPacket _radioData;
+
 
 void setup() {
   Serial.begin(9600);
-  wheelLeft.attach(4);
-  wheelRight.attach(3);
-  gripper.attach(2);
+  wheelLeft.attach(13);
+  wheelRight.attach(12);
+  gripper.attach(11);
+  pinMode(IRPin, INPUT);
+  myIR.enableIRIn();
 
-  //CHANGES for v1.6 HERE!!! **************PAY ATTENTION*************
 
   error = ps2x.config_gamepad(8, 6, 5, 7, true, true); //setup pins and settings:  GamePad(clock, command, attention, data, Pressures?, Rumble?) check for error
 
@@ -67,14 +69,31 @@ void setup() {
       break;
   }
 
-  if (!_radio.init(RADIO_ID, PIN_RADIO_CE, PIN_RADIO_CSN)) {
-    Serial.println("Cannot communicate with transciever");
-  }
+
 
 }
 
 void loop() {
 
+
+  if (ps2ControllerMode == true) { //control with ps2 controller
+    controller();
+  } else { //control with IR remote
+    
+    if (myIR.decode(&results)) {
+      Serial.println("ir");
+      Serial.println(results.value, HEX);
+      translateIR();
+      myIR.resume();
+    }
+
+  }
+
+  delay(50);
+
+}
+
+void controller() {
   if (error == 1) //skip loop if no controller found
     return;
 
@@ -110,11 +129,6 @@ void loop() {
     gripper.write(gripperPosition);
 
   }
-
-  readTransceiver();
-  
-  delay(50);
-
 }
 
 void joystickControls() {
@@ -173,16 +187,108 @@ void buttonControls() {
   }
 }
 
-void readTransceiver() {
-  _radio.readData(&_radioData); 
+void translateIR() {                        // takes action based on IR code received
+  switch (results.value) {
+    case 0xFFA25D:
+      Serial.println("POWER");
+      break;
+    case 0xFFE21D:
+      Serial.println("FUNC/STOP");
+      break;
+    case 0xFF629D:
+      Serial.println("VOL+");
 
-  String msg = "Radio ";
-  msg += _radioData.FromRadioId;
-  msg += ", ";
-  msg += _radioData.OnTimeMillis;
-  msg += " ms, ";
-  msg += _radioData.FailedTxCount;
-  msg += " Failed TX";
-
-  Serial.println(msg);
+      break;
+    case 0xFF22DD:
+      Serial.println("REWIND");
+      break;
+    case 0xFF02FD:
+      Serial.println("PLAY/PAUSE");
+      break;
+    case 0xFFC23D:
+      Serial.println("FAST FORWARD");
+      break;
+    case 0xFFE01F:
+      Serial.println("DOWN");
+      break;
+    case 0xFFA857:
+      Serial.println("VOL-");
+      break;
+    case 0xFF906F:
+      Serial.println("UP");
+      break;
+    case 0xFF9867:
+      Serial.println("EQ");
+      break;
+    case 0xFFB04F:
+      Serial.println("ST/REPT");
+      break;
+    case 0xFF6897:
+      Serial.println("0");
+      break;
+    case 0xFF30CF:
+      Serial.println("1");
+      wheelLeft.write(45);
+      wheelRight.write(45);
+      delay(IRStep);
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+      break;
+    case 0xFF18E7:
+      Serial.println("2");
+      wheelLeft.write(135);
+      wheelRight.write(45);
+      delay(IRStep);
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+      break;
+    case 0xFF7A85:
+      Serial.println("3");
+      wheelLeft.write(135);
+      wheelRight.write(135);
+      delay(IRStep);
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+      break;
+    case 0xFF10EF:
+      Serial.println("4");
+      wheelLeft.write(95);
+      wheelRight.write(45);
+      delay(IRStep);
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+      break;
+    case 0xFF38C7:
+      Serial.println("5");
+      break;
+    case 0xFF5AA5:
+      Serial.println("6");
+      wheelLeft.write(135);
+      wheelRight.write(90);
+      delay(IRStep);
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+      break;
+    case 0xFF42BD:
+      Serial.println("7");
+      break;
+    case 0xFF4AB5:
+      Serial.println("8");
+      wheelLeft.write(45);
+      wheelRight.write(135);
+      delay(IRStep);
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+      break;
+    case 0xFF52AD:
+      Serial.println("9");
+      break;
+    case 0xFFFFFFFF:
+      Serial.println(" REPEAT");
+      break;
+    default:
+      Serial.println("other button");
+      break;
+  }
+  delay(500);
 }
