@@ -1,3 +1,7 @@
+
+
+#include <SR04.h>
+
 #include <EIRremote.h>
 #include <EIRremoteInt.h>
 
@@ -7,10 +11,21 @@
 #include <NRFLite.h>
 
 
-bool ps2ControllerMode = false; //true to use ps2 controller, false to use ir remote
+bool ps2ControllerMode = true; //true to use ps2 controller, false to use ir remote
 int IRStep = 1000;
 
+int triggerPin = 3;
+int echoPin = 2;
 int IRPin = 10;
+int lineLeftPin = A0;
+int lineCenterPin = A2;
+int lineRightPin = A1;
+int lineLeft = 0;
+int lineRight = 0;
+int lineCenter = 0;
+int lineLeftInit = 0;
+int lineRightInit = 0;
+int lineCenterInit = 0;
 int error = 0;
 byte type = 0;
 byte vibrate = 0;
@@ -20,7 +35,7 @@ Servo gripper;
 IRrecv myIR(IRPin);
 decode_results results;
 PS2X ps2x; // create PS2 Controller Class
-
+SR04 prox = SR04(echoPin, triggerPin);
 bool joystickMode = false;
 int gripperPosition = 0;
 
@@ -35,6 +50,9 @@ void setup() {
   pinMode(IRPin, INPUT);
   myIR.enableIRIn();
 
+  lineLeftInit = analogRead(lineLeftPin);
+  lineCenterInit = analogRead(lineCenterPin);
+  lineRightInit = analogRead(lineRightPin);
 
   error = ps2x.config_gamepad(8, 6, 5, 7, true, true); //setup pins and settings:  GamePad(clock, command, attention, data, Pressures?, Rumble?) check for error
 
@@ -77,6 +95,16 @@ void loop() {
 
 
   if (ps2ControllerMode == true) { //control with ps2 controller
+    if (ps2x.ButtonPressed(PSB_PINK)) {
+      Serial.println("1");
+      chicken(1);
+    } else if (ps2x.ButtonPressed(PSB_BLUE)) {
+      Serial.println("2");
+      chicken(2);
+    } else if (ps2x.ButtonPressed(PSB_RED)) {
+      Serial.println("3");
+      chicken(0);
+    }
     controller();
   } else { //control with IR remote
 
@@ -90,8 +118,119 @@ void loop() {
   }
 
   gripper.write(gripperPosition);
-  
+
   delay(50);
+
+}
+
+void chicken(int path) {
+  int prevCorrect = 0;
+  bool loopy = true;
+  wheelLeft.write(135);
+  wheelRight.write(45);
+  delay(500);
+  while (loopy) {
+    lineLeft = analogRead(lineLeftPin);
+    lineCenter = analogRead(lineCenterPin);
+    lineRight = analogRead(lineRightPin);
+    Serial.print(lineLeft);
+    Serial.print(" ");
+    Serial.print(lineCenter);
+    Serial.print(" ");
+    Serial.println(lineRight);
+
+    if (lineLeft < lineLeftInit + 100 && lineRight < lineRightInit + 100) {
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+
+      loopy = false;
+      break;
+    } else if (lineLeft < lineLeftInit + 100) {
+      wheelLeft.write(95);
+      wheelRight.write(45);
+    } else if (lineRight < lineRightInit + 100) {
+      wheelLeft.write(135);
+      wheelRight.write(90);
+    } else {
+      wheelLeft.write(135);
+      wheelRight.write(45);
+    }
+  }
+  Serial.println("i did a lopp");
+  if (path == 0) {
+    wheelLeft.write(135);
+    wheelRight.write(135);
+    delay(500);
+  } else if (path == 1) {
+    wheelLeft.write(45);
+    wheelRight.write(45);
+    delay(500);
+  } else if (path == 2) {
+
+  }
+  bool snoopy = true;
+  while (snoopy) {
+    lineLeft = analogRead(lineLeftPin);
+    lineCenter = analogRead(lineCenterPin);
+    lineRight = analogRead(lineRightPin);
+    Serial.print(lineLeft);
+    Serial.print(" ");
+    Serial.print(lineCenter);
+    Serial.print(" ");
+    Serial.println(lineRight);
+
+    if (lineLeft < lineLeftInit + 100 && lineRight < lineRightInit + 100) {
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+
+      snoopy = false;
+      break;
+    }
+  }
+  loopy = true;
+  while (loopy) {
+    lineLeft = analogRead(lineLeftPin);
+    lineCenter = analogRead(lineCenterPin);
+    lineRight = analogRead(lineRightPin);
+    Serial.print(lineLeft);
+    Serial.print(" ");
+    Serial.print(lineCenter);
+    Serial.print(" ");
+    Serial.println(lineRight);
+
+    int distanceProx = 1000;
+    distanceProx = prox.Distance();
+    Serial.println(distanceProx);
+    if (distanceProx < 20 && distanceProx !=0) {
+      wheelLeft.writeMicroseconds(1500);
+      wheelRight.writeMicroseconds(1500);
+      gripperPosition = 0;
+      loopy = false;
+      break;
+    } else if (lineLeft < lineLeftInit + 100) {
+      wheelLeft.write(95);
+      wheelRight.write(65);
+      prevCorrect = 1;
+    } else if (lineRight < lineRightInit + 100) {
+      wheelLeft.write(115);
+      wheelRight.write(90);
+      prevCorrect = 2;
+    } else if (lineCenter < lineCenterInit + 100) {
+      wheelLeft.write(115);
+      wheelRight.write(65);
+    } else if (prevCorrect == 1) {
+      wheelLeft.write(115);
+      wheelRight.write(90);
+    } else if (prevCorrect == 2) {
+      wheelLeft.write(95);
+      wheelRight.write(65);
+    } else {
+      wheelLeft.write(115);
+      wheelRight.write(65);
+    }
+  }
+
+
 
 }
 
@@ -128,7 +267,7 @@ void controller() {
         gripperPosition = 0;
       }
     }
-    
+
 
   }
 }
